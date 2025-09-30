@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <title>ベクトル演算デモ（2D）</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.6.0/p5.min.js"></script>
+</head>
+<body>
+  <h2>ベクトル演算デモ（2D）</h2>
+  <label for="operation">操作を選択: </label>
+  <select id="operation">
+    <option>ベクトル加算</option>
+    <option>定数倍</option>
+    <option>単位ベクトル</option>
+    <option>基本ベクトル</option>
+    <option>内積</option>
+    <option>外積</option>
+  </select>
+  <button onclick="runDemo()">実行</button>
+  <div id="canvas"></div>
+
+  <script>
+    let operation = "ベクトル加算";
+    let v1 = null, v2 = null;
+
+    function setup() {
+      let cnv = createCanvas(400, 400);
+      cnv.parent("canvas");
+      textSize(14);
+      v1 = createVector(2, 1);
+      v2 = createVector(1, -1);
+      noLoop();
+    }
+
+    function drawAxes() {
+      stroke(200);
+      line(0, 200, 400, 200); // x軸
+      line(200, 0, 200, 400); // y軸
+    }
+
+    function drawVector(v, color) {
+      stroke(color);
+      fill(color);
+      line(200, 200, 200 + v.x * 50, 200 - v.y * 50);
+      ellipse(200 + v.x * 50, 200 - v.y * 50, 6, 6);
+    }
+
+    function runDemo() {
+      operation = document.getElementById("operation").value;
+      redraw();
+    }
+
+    function draw() {
+      background(245);
+      drawAxes();
+
+      if (operation === "ベクトル加算") {
+        drawVector(v1, "red");
+        drawVector(v2, "blue");
+        drawVector(p5.Vector.add(v1, v2), "green");
+
+      } else if (operation === "定数倍") {
+        drawVector(v1, "red");
+        let scaled = p5.Vector.mult(v1, 1.5);
+        drawVector(scaled, "blue");
+
+      } else if (operation === "単位ベクトル") {
+        drawVector(v1, "red");
+        let unit = v1.copy().normalize();
+        drawVector(unit, "blue");
+
+      } else if (operation === "基本ベクトル") {
+        drawVector(createVector(1, 0), "red");
+        drawVector(createVector(0, 1), "blue");
+
+      } else if (operation === "内積") {
+        drawVector(v1, "red");
+        drawVector(v2, "blue");
+        let dot = v1.x * v2.x + v1.y * v2.y;
+        fill(0);
+        text("内積: " + dot.toFixed(2), 10, 20);
+
+      } else if (operation === "外積") {
+        drawVector(v1, "red");
+        drawVector(v2, "blue");
+        // 2D外積はz方向のスカラー（v1.x*v2.y - v1.y*v2.x）
+        let cross = v1.x * v2.y - v1.y * v2.x;
+        fill(0);
+        text("外積(2D): " + cross.toFixed(2) + " (z方向)", 10, 20);
+      }
+    }
+  </script>
+</body>
+</html>
