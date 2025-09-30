@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>ベクトル内積・外積デモ</title>
+<title>ベクトル内積・外積デモ（点線平行四辺形）</title>
 <style>
 body { margin:0; overflow:hidden; }
 #info {
@@ -51,14 +51,16 @@ const crossLengthText = infoElement.children[2];
 const projGeometry = new THREE.BufferGeometry();
 projGeometry.setAttribute('position', new THREE.BufferAttribute(new Float32Array(6),3));
 const projLine = new THREE.Line(projGeometry, new THREE.LineBasicMaterial({color:0xffff00}));
-projLine.renderOrder = 3; // 前面
+projLine.renderOrder = 3;
 scene.add(projLine);
 
-// 平行四辺形（橙）
+// 平行四辺形（橙・点線化）
 const paraGeometry = new THREE.BufferGeometry();
 paraGeometry.setAttribute('position', new THREE.BufferAttribute(new Float32Array(15),3));
-const paraLine = new THREE.Line(paraGeometry, new THREE.LineBasicMaterial({color:0xff8800}));
-paraLine.renderOrder = 0; // 背面
+const paraMaterial = new THREE.LineDashedMaterial({ color:0xff8800, dashSize:0.05, gapSize:0.03 });
+const paraLine = new THREE.Line(paraGeometry, paraMaterial);
+paraLine.computeLineDistances(); // 点線用
+paraLine.renderOrder = 0;
 scene.add(paraLine);
 
 camera.position.set(0,0.3,2);
@@ -117,6 +119,8 @@ function updateCrossAndParallelogram(){
     paraGeometry.attributes.position.setXYZ(3,p4.x,p4.y,p4.z);
     paraGeometry.attributes.position.setXYZ(4,p1.x,p1.y,p1.z);
     paraGeometry.attributes.position.needsUpdate = true;
+
+    paraLine.computeLineDistances(); // 点線反映
 }
 
 function animate(){
