@@ -1,74 +1,132 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-  <meta charset="UTF-8">
-  <title>ベクトル加算デモ（2D, アニメーション）</title>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.6.0/p5.min.js"></script>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ベクトル内積・外積デモ</title>
+<style>
+body { margin:0; overflow:hidden; }
+#info {
+    position:absolute; top:0; left:0;
+    color:white; font-family:sans-serif;
+    padding:10px; background-color: rgba(0,0,0,0.5);
+}
+#legend {
+    position:absolute; bottom:10px; left:10px;
+    color:white; font-family:sans-serif;
+    padding:10px; background-color: rgba(0,0,0,0.5);
+}
+</style>
 </head>
 <body>
-  <h2>ベクトル加算デモ（赤固定・青伸縮・緑追従）</h2>
-  <button onclick="runDemo()">実行</button>
-  <div id="canvas"></div>
+<div id="info">
+<p>内積: 0</p>
+<p>なす角: 0°</p>
+<p>外積ベクトルの長さ: 0</p>
+</div>
+<div id="legend">
+<p>赤：ベクトルA</p>
+<p>緑：ベクトルB</p>
+<p>青：外積ベクトルC</p>
+<p>黄：内積の射影線</p>
+<p>橙：2ベクトルからなる平行四辺形</p>
+</div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.1, 1000);
+const renderer = new THREE.WebGLRenderer({antialias:true});
+document.body.appendChild(renderer.domElement);
+renderer.setSize(window.innerWidth, window.innerHeight);
 
-  <script>
-    let v1, v2;
-    let progress = 0;
-    let animating = false;
+const vectorA = new THREE.Vector3(1,0,0);
+const vectorB = new THREE.Vector3();
+const arrowHelpers = {};
+const infoElement = document.getElementById('info');
+const dotText = infoElement.children[0];
+const angleText = infoElement.children[1];
+const crossLengthText = infoElement.children[2];
 
-    function setup() {
-      let cnv = createCanvas(400, 400);
-      cnv.parent("canvas");
-      v1 = createVector(2, 1);   // 赤ベクトル
-      v2 = createVector(1, -1);  // 青ベクトル
-      frameRate(60);
-      noLoop();
-    }
+// 内積射影線（黄）
+const projGeometry = new THREE.BufferGeometry();
+projGeometry.setAttribute('position', new THREE.BufferAttribute(new Float32Array(6),3));
+const projLine = new THREE.Line(projGeometry, new THREE.LineBasicMaterial({color:0xffff00}));
+projLine.renderOrder = 3; // 前面
+scene.add(projLine);
 
-    function drawAxes() {
-      stroke(200);
-      line(0, 200, 400, 200); // x軸
-      line(200, 0, 200, 400); // y軸
-    }
+// 平行四辺形（橙）
+const paraGeometry = new THREE.BufferGeometry();
+paraGeometry.setAttribute('position', new THREE.BufferAttribute(new Float32Array(15),3));
+const paraLine = new THREE.Line(paraGeometry, new THREE.LineBasicMaterial({color:0xff8800}));
+paraLine.renderOrder = 0; // 背面
+scene.add(paraLine);
 
-    function drawVector(v, col, scale=1.0, offset=createVector(0,0)) {
-      stroke(col);
-      fill(col);
-      line(200 + offset.x, 200 - offset.y,
-           200 + offset.x + v.x * 50 * scale,
-           200 - offset.y - v.y * 50 * scale);
-      ellipse(200 + offset.x + v.x * 50 * scale,
-              200 - offset.y - v.y * 50 * scale, 6, 6);
-    }
+camera.position.set(0,0.3,2);
 
-    function runDemo() {
-      progress = 0;
-      animating = true;
-      loop();
-    }
+// 矢印
+arrowHelpers.A = new THREE.ArrowHelper(vectorA.clone().normalize(), new THREE.Vector3(), vectorA.length(), 0xff0000);
+arrowHelpers.A.renderOrder = 1;
+arrowHelpers.B = new THREE.ArrowHelper(new THREE.Vector3(1,0,0), new THREE.Vector3(), 1, 0x00ff00);
+arrowHelpers.B.renderOrder = 2;
+arrowHelpers.C = new THREE.ArrowHelper(new THREE.Vector3(0,0,0), new THREE.Vector3(), 0, 0x0000ff);
+arrowHelpers.C.renderOrder = 2;
+scene.add(arrowHelpers.A);
+scene.add(arrowHelpers.B);
+scene.add(arrowHelpers.C);
 
-    function draw() {
-      background(245);
-      drawAxes();
+window.addEventListener('resize', ()=>{
+    camera.aspect = window.innerWidth/window.innerHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(window.innerWidth, window.innerHeight);
+});
 
-      // 赤ベクトル（固定）
-      drawVector(v1, "red");
+function updateVectorB(){
+    const time = Date.now()*0.002;
+    vectorB.set(Math.cos(time), Math.sin(time), 0);
+    arrowHelpers.B.setDirection(vectorB.clone().normalize());
+    arrowHelpers.B.setLength(vectorB.length());
+}
 
-      // 青ベクトル（原点から伸び縮み）
-      let blueScale = 0.2 + 0.8 * abs(sin(progress * PI)); // 0.2〜1で伸縮
-      drawVector(v2, "blue", blueScale);
+function updateDotAndProjection(){
+    const dot = vectorA.dot(vectorB);
+    const angle = Math.acos(dot/(vectorA.length()*vectorB.length()));
+    dotText.textContent = `内積: ${dot.toFixed(2)}`;
+    angleText.textContent = `なす角: ${(angle*180/Math.PI).toFixed(1)}°`;
 
-      // 加算結果の緑（赤 + 青）
-      let result = p5.Vector.add(v1, p5.Vector.mult(v2, blueScale));
-      drawVector(result, "green");
+    const proj = vectorA.clone().multiplyScalar(dot/(vectorA.length()*vectorA.length()));
+    projGeometry.attributes.position.setXYZ(0,0,0,0);
+    projGeometry.attributes.position.setXYZ(1,proj.x,proj.y,proj.z);
+    projGeometry.attributes.position.setXYZ(2,0,0,0);
+    projGeometry.attributes.position.setXYZ(3,proj.x,proj.y,proj.z);
+    projGeometry.attributes.position.needsUpdate = true;
+}
 
-      if (animating) {
-        progress += 0.02;
-        if (progress >= 2) { // 2周期で停止
-          animating = false;
-          noLoop();
-        }
-      }
-    }
-  </script>
+function updateCrossAndParallelogram(){
+    const cross = new THREE.Vector3().crossVectors(vectorA, vectorB);
+    crossLengthText.textContent = `外積ベクトルの長さ: ${cross.length().toFixed(2)}`;
+    arrowHelpers.C.setDirection(cross.clone().normalize());
+    arrowHelpers.C.setLength(cross.length());
+
+    const p1 = new THREE.Vector3(0,0,0);
+    const p2 = vectorA.clone();
+    const p3 = vectorA.clone().add(vectorB);
+    const p4 = vectorB.clone();
+    paraGeometry.attributes.position.setXYZ(0,p1.x,p1.y,p1.z);
+    paraGeometry.attributes.position.setXYZ(1,p2.x,p2.y,p2.z);
+    paraGeometry.attributes.position.setXYZ(2,p3.x,p3.y,p3.z);
+    paraGeometry.attributes.position.setXYZ(3,p4.x,p4.y,p4.z);
+    paraGeometry.attributes.position.setXYZ(4,p1.x,p1.y,p1.z);
+    paraGeometry.attributes.position.needsUpdate = true;
+}
+
+function animate(){
+    requestAnimationFrame(animate);
+    updateVectorB();
+    updateDotAndProjection();
+    updateCrossAndParallelogram();
+    renderer.render(scene,camera);
+}
+animate();
+</script>
 </body>
 </html>
