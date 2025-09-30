@@ -2,11 +2,11 @@
 <html lang="ja">
 <head>
   <meta charset="UTF-8">
-  <title>ベクトル演算デモ（2D）</title>
+  <title>ベクトル演算デモ（2D, アニメーション付）</title>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.6.0/p5.min.js"></script>
 </head>
 <body>
-  <h2>ベクトル演算デモ（2D）</h2>
+  <h2>ベクトル演算デモ（2D, アニメーション付）</h2>
   <label for="operation">操作を選択: </label>
   <select id="operation">
     <option>ベクトル加算</option>
@@ -21,7 +21,9 @@
 
   <script>
     let operation = "ベクトル加算";
-    let v1 = null, v2 = null;
+    let v1, v2;
+    let progress = 0; // アニメーション進行度 (0〜1)
+    let animating = false;
 
     function setup() {
       let cnv = createCanvas(400, 400);
@@ -29,6 +31,7 @@
       textSize(14);
       v1 = createVector(2, 1);
       v2 = createVector(1, -1);
+      frameRate(60);
       noLoop();
     }
 
@@ -38,16 +41,18 @@
       line(200, 0, 200, 400); // y軸
     }
 
-    function drawVector(v, color) {
+    function drawVector(v, color, scale=1.0) {
       stroke(color);
       fill(color);
-      line(200, 200, 200 + v.x * 50, 200 - v.y * 50);
-      ellipse(200 + v.x * 50, 200 - v.y * 50, 6, 6);
+      line(200, 200, 200 + v.x * 50 * scale, 200 - v.y * 50 * scale);
+      ellipse(200 + v.x * 50 * scale, 200 - v.y * 50 * scale, 6, 6);
     }
 
     function runDemo() {
       operation = document.getElementById("operation").value;
-      redraw();
+      progress = 0;
+      animating = true;
+      loop();
     }
 
     function draw() {
@@ -55,38 +60,61 @@
       drawAxes();
 
       if (operation === "ベクトル加算") {
-        drawVector(v1, "red");
-        drawVector(v2, "blue");
-        drawVector(p5.Vector.add(v1, v2), "green");
+        drawVector(v1, "red", min(progress,1));
+        drawVector(v2, "blue", min(progress,1));
+        if (progress > 0.5) {
+          let scale = (progress-0.5)*2; // 0〜1に正規化
+          drawVector(p5.Vector.add(v1, v2), "green", constrain(scale,0,1));
+        }
 
       } else if (operation === "定数倍") {
-        drawVector(v1, "red");
-        let scaled = p5.Vector.mult(v1, 1.5);
-        drawVector(scaled, "blue");
+        drawVector(v1, "red", min(progress,1));
+        if (progress > 0.3) {
+          let scaled = p5.Vector.mult(v1, 1.5);
+          let scale = (progress-0.3)/0.7;
+          drawVector(scaled, "blue", constrain(scale,0,1));
+        }
 
       } else if (operation === "単位ベクトル") {
-        drawVector(v1, "red");
-        let unit = v1.copy().normalize();
-        drawVector(unit, "blue");
+        drawVector(v1, "red", min(progress,1));
+        if (progress > 0.3) {
+          let unit = v1.copy().normalize();
+          let scale = (progress-0.3)/0.7;
+          drawVector(unit, "blue", constrain(scale,0,1));
+        }
 
       } else if (operation === "基本ベクトル") {
-        drawVector(createVector(1, 0), "red");
-        drawVector(createVector(0, 1), "blue");
+        drawVector(createVector(1, 0), "red", min(progress,1));
+        if (progress > 0.3) {
+          let scale = (progress-0.3)/0.7;
+          drawVector(createVector(0, 1), "blue", constrain(scale,0,1));
+        }
 
       } else if (operation === "内積") {
-        drawVector(v1, "red");
-        drawVector(v2, "blue");
-        let dot = v1.x * v2.x + v1.y * v2.y;
-        fill(0);
-        text("内積: " + dot.toFixed(2), 10, 20);
+        drawVector(v1, "red", min(progress,1));
+        drawVector(v2, "blue", min(progress,1));
+        if (progress >= 1) {
+          let dot = v1.x * v2.x + v1.y * v2.y;
+          fill(0);
+          text("内積: " + dot.toFixed(2), 10, 20);
+        }
 
       } else if (operation === "外積") {
-        drawVector(v1, "red");
-        drawVector(v2, "blue");
-        // 2D外積はz方向のスカラー（v1.x*v2.y - v1.y*v2.x）
-        let cross = v1.x * v2.y - v1.y * v2.x;
-        fill(0);
-        text("外積(2D): " + cross.toFixed(2) + " (z方向)", 10, 20);
+        drawVector(v1, "red", min(progress,1));
+        drawVector(v2, "blue", min(progress,1));
+        if (progress >= 1) {
+          let cross = v1.x * v2.y - v1.y * v2.x;
+          fill(0);
+          text("外積(2D): " + cross.toFixed(2) + " (z方向)", 10, 20);
+        }
+      }
+
+      if (animating) {
+        progress += 0.02; // 速度
+        if (progress >= 1) {
+          animating = false;
+          noLoop();
+        }
       }
     }
   </script>
