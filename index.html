@@ -1,136 +1,97 @@
-<!DOCTYPE html>
-<html lang="ja">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>ベクトル内積・外積デモ（点線平行四辺形）</title>
-<style>
-body { margin:0; overflow:hidden; }
-#info {
-    position:absolute; top:0; left:0;
-    color:white; font-family:sans-serif;
-    padding:10px; background-color: rgba(0,0,0,0.5);
-}
-#legend {
-    position:absolute; bottom:10px; left:10px;
-    color:white; font-family:sans-serif;
-    padding:10px; background-color: rgba(0,0,0,0.5);
-}
-</style>
-</head>
-<body>
-<div id="info">
-<p>内積: 0</p>
-<p>なす角: 0°</p>
-<p>外積ベクトルの長さ: 0</p>
-</div>
-<div id="legend">
-<p>赤：ベクトルA</p>
-<p>緑：ベクトルB</p>
-<p>青：外積ベクトルC</p>
-<p>黄：内積の射影線</p>
-<p>橙：2ベクトルからなる平行四辺形</p>
-</div>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-<script>
-const scene = new THREE.Scene();
-const camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.1, 1000);
-const renderer = new THREE.WebGLRenderer({antialias:true});
-document.body.appendChild(renderer.domElement);
-renderer.setSize(window.innerWidth, window.innerHeight);
+from pathlib import Path
 
-const vectorA = new THREE.Vector3(1,0,0);
-const vectorB = new THREE.Vector3();
-const arrowHelpers = {};
-const infoElement = document.getElementById('info');
-const dotText = infoElement.children[0];
-const angleText = infoElement.children[1];
-const crossLengthText = infoElement.children[2];
+path = Path("/mnt/data/vector_visualizer.html")
+html = path.read_text(encoding="utf-8")
 
-// 内積射影線（黄）
-const projGeometry = new THREE.BufferGeometry();
-projGeometry.setAttribute('position', new THREE.BufferAttribute(new Float32Array(6),3));
-const projLine = new THREE.Line(projGeometry, new THREE.LineBasicMaterial({color:0xffff00}));
-projLine.renderOrder = 3;
-scene.add(projLine);
+html = html.replace(
+'''        <div class="meter">
+          <span>−最大</span>
+          <div class="meterbar"><div id="dotMeter" class="meterfill"></div></div>
+          <span>＋最大</span>
+        </div>
+      </div>''',
+'''        <div class="meter">
+          <span>−最大</span>
+          <div class="meterbar"><div id="dotMeter" class="meterfill"></div></div>
+          <span>＋最大</span>
+        </div>
+        <div style="margin-top:12px">
+          <div id="curveTitle" class="small" style="margin-bottom:6px"></div>
+          <svg id="curveViz" viewBox="0 0 620 190" role="img" aria-label="角度と内積または外積の関係"></svg>
+        </div>
+      </div>'''
+)
 
-// 平行四辺形（橙・点線化）
-const paraGeometry = new THREE.BufferGeometry();
-paraGeometry.setAttribute('position', new THREE.BufferAttribute(new Float32Array(15),3));
-const paraMaterial = new THREE.LineDashedMaterial({ color:0xff8800, dashSize:0.05, gapSize:0.03 });
-const paraLine = new THREE.Line(paraGeometry, paraMaterial);
-paraLine.computeLineDistances(); // 点線用
-paraLine.renderOrder = 0;
-scene.add(paraLine);
+html = html.replace(
+'''  function updateRotationMetrics(){
+    const a=getA(), b=getB();
+    const theta=angleBetween(a,b), d=dot(a,b), c=Math.abs(cross(a,b));
+    $('mTheta').textContent=fmt(theta)+'°';
+    $('mDot').textContent=fmt(d);
+    $('mCross').textContent=fmt(c);
+    const max=Math.max(1e-9,mag(a)*mag(b));
+    const ratio=Math.max(-1,Math.min(1,d/max));
+    const meter=$('dotMeter');
+    if(ratio>=0){ meter.style.left='50%'; meter.style.width=(ratio*50)+'%'; }
+    else { meter.style.left=(50+ratio*50)+'%'; meter.style.width=(-ratio*50)+'%'; }
+    $('angleLabel').textContent=$('angleSlider').value+'°';
+  }''',
+'''  function drawCurve(){
+    const cv=$('curveViz');
+    const a=getA();
+    const M=Math.max(1e-9,mag(a)*S.baseBMag);
+    const o=op();
+    const w=620,h=190,L=42,R=14,T=14,B=30;
+    const pw=w-L-R, ph=h-T-B;
+    const x=d=>L+(d/360)*pw;
+    let y, points='', zeroY;
+    if(o==='dot'){
+      y=v=>T+((M-v)/(2*M))*ph;
+      zeroY=y(0);
+      for(let d=0;d<=360;d+=3){
+        const v=M*Math.cos(d*Math.PI/180);
+        points+=`${x(d)},${y(v)} `;
+      }
+      $('curveTitle').textContent='内積 a·b = |a||b| cos θ：90°・270°で 0、180°で最小';
+    }else{
+      y=v=>T+((M-v)/M)*ph;
+      zeroY=y(0);
+      for(let d=0;d<=360;d+=3){
+        const v=M*Math.abs(Math.sin(d*Math.PI/180));
+        points+=`${x(d)},${y(v)} `;
+      }
+      $('curveTitle').textContent='平行四辺形の面積 |a×b| = |a||b||sin θ|：平行で 0、直交で最大';
+    }
+    const deg=n($('angleSlider').value);
+    const val=o==='dot'?M*Math.cos(deg*Math.PI/180):M*Math.abs(Math.sin(deg*Math.PI/180));
+    let s='';
+    s+=`<rect x="${L}" y="${T}" width="${pw}" height="${ph}" fill="#fbfcfe" stroke="#d8dee9"/>`;
+    [0,90,180,270,360].forEach(d=>{
+      s+=`<line x1="${x(d)}" y1="${T}" x2="${x(d)}" y2="${T+ph}" stroke="#e8ecf3"/>`;
+      s+=`<text x="${x(d)}" y="${h-9}" text-anchor="middle" font-size="11" fill="#697386">${d}°</text>`;
+    });
+    s+=`<line x1="${L}" y1="${zeroY}" x2="${L+pw}" y2="${zeroY}" stroke="#9aa7bd" stroke-width="1.2"/>`;
+    s+=`<polyline points="${points}" fill="none" stroke="#0f9d78" stroke-width="3"/>`;
+    s+=`<line x1="${x(deg)}" y1="${T}" x2="${x(deg)}" y2="${T+ph}" stroke="#315efb" stroke-width="2" stroke-dasharray="5 4"/>`;
+    s+=`<circle cx="${x(deg)}" cy="${y(val)}" r="5" fill="#315efb"/>`;
+    cv.innerHTML=s;
+  }
 
-camera.position.set(0,0.3,2);
+  function updateRotationMetrics(){
+    const a=getA(), b=getB();
+    const theta=angleBetween(a,b), d=dot(a,b), c=Math.abs(cross(a,b));
+    $('mTheta').textContent=fmt(theta)+'°';
+    $('mDot').textContent=fmt(d);
+    $('mCross').textContent=fmt(c);
+    const max=Math.max(1e-9,mag(a)*mag(b));
+    const ratio=Math.max(-1,Math.min(1,d/max));
+    const meter=$('dotMeter');
+    if(ratio>=0){ meter.style.left='50%'; meter.style.width=(ratio*50)+'%'; }
+    else { meter.style.left=(50+ratio*50)+'%'; meter.style.width=(-ratio*50)+'%'; }
+    $('angleLabel').textContent=$('angleSlider').value+'°';
+    drawCurve();
+  }'''
+)
 
-// 矢印
-arrowHelpers.A = new THREE.ArrowHelper(vectorA.clone().normalize(), new THREE.Vector3(), vectorA.length(), 0xff0000);
-arrowHelpers.A.renderOrder = 1;
-arrowHelpers.B = new THREE.ArrowHelper(new THREE.Vector3(1,0,0), new THREE.Vector3(), 1, 0x00ff00);
-arrowHelpers.B.renderOrder = 2;
-arrowHelpers.C = new THREE.ArrowHelper(new THREE.Vector3(0,0,0), new THREE.Vector3(), 0, 0x0000ff);
-arrowHelpers.C.renderOrder = 2;
-scene.add(arrowHelpers.A);
-scene.add(arrowHelpers.B);
-scene.add(arrowHelpers.C);
-
-window.addEventListener('resize', ()=>{
-    camera.aspect = window.innerWidth/window.innerHeight;
-    camera.updateProjectionMatrix();
-    renderer.setSize(window.innerWidth, window.innerHeight);
-});
-
-function updateVectorB(){
-    const time = Date.now()*0.002;
-    vectorB.set(Math.cos(time), Math.sin(time), 0);
-    arrowHelpers.B.setDirection(vectorB.clone().normalize());
-    arrowHelpers.B.setLength(vectorB.length());
-}
-
-function updateDotAndProjection(){
-    const dot = vectorA.dot(vectorB);
-    const angle = Math.acos(dot/(vectorA.length()*vectorB.length()));
-    dotText.textContent = `内積: ${dot.toFixed(2)}`;
-    angleText.textContent = `なす角: ${(angle*180/Math.PI).toFixed(1)}°`;
-
-    const proj = vectorA.clone().multiplyScalar(dot/(vectorA.length()*vectorA.length()));
-    projGeometry.attributes.position.setXYZ(0,0,0,0);
-    projGeometry.attributes.position.setXYZ(1,proj.x,proj.y,proj.z);
-    projGeometry.attributes.position.setXYZ(2,0,0,0);
-    projGeometry.attributes.position.setXYZ(3,proj.x,proj.y,proj.z);
-    projGeometry.attributes.position.needsUpdate = true;
-}
-
-function updateCrossAndParallelogram(){
-    const cross = new THREE.Vector3().crossVectors(vectorA, vectorB);
-    crossLengthText.textContent = `外積ベクトルの長さ: ${cross.length().toFixed(2)}`;
-    arrowHelpers.C.setDirection(cross.clone().normalize());
-    arrowHelpers.C.setLength(cross.length());
-
-    const p1 = new THREE.Vector3(0,0,0);
-    const p2 = vectorA.clone();
-    const p3 = vectorA.clone().add(vectorB);
-    const p4 = vectorB.clone();
-    paraGeometry.attributes.position.setXYZ(0,p1.x,p1.y,p1.z);
-    paraGeometry.attributes.position.setXYZ(1,p2.x,p2.y,p2.z);
-    paraGeometry.attributes.position.setXYZ(2,p3.x,p3.y,p3.z);
-    paraGeometry.attributes.position.setXYZ(3,p4.x,p4.y,p4.z);
-    paraGeometry.attributes.position.setXYZ(4,p1.x,p1.y,p1.z);
-    paraGeometry.attributes.position.needsUpdate = true;
-
-    paraLine.computeLineDistances(); // 点線反映
-}
-
-function animate(){
-    requestAnimationFrame(animate);
-    updateVectorB();
-    updateDotAndProjection();
-    updateCrossAndParallelogram();
-    renderer.render(scene,camera);
-}
-animate();
-</script>
-</body>
-</html>
+path.write_text(html, encoding="utf-8")
+print("角度変化グラフを追加しました。")
